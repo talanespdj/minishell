@@ -22,8 +22,9 @@ int	_execmd(t_all *all, t_msh *msh, t_cmd *cmd, t_pos pos)
 	int					rtval;
 
 	rtval = 0;
-	if (!cmd || ((pos == SOLO && !cmd->redir && (cmd->name
-					&& tstrcmp(cmd->name, "env") && exec_buitin(msh, cmd)))))
+	if (!cmd || !cmd->has_to_be_executed || ((pos == SOLO && !cmd->redir
+				&& (cmd->name && tstrcmp(cmd->name, "env")
+					&& exec_buitin(msh, cmd)))))
 		return (0);
 	tpid = fork();
 	if (tpid == -1)
@@ -46,7 +47,7 @@ static	void	_exec_child(t_all *all, t_msh *msh, t_cmd *cmd, t_pos pos)
 {
 	init_signals_child();
 	chromakopia(all, msh, cmd, pos);
-	if (!cmd->name || g_sig || !cmd->has_to_be_executed)
+	if (!cmd->name || g_sig)
 	{
 		free_exit(all, msh, 1);
 		exit(0);
@@ -58,12 +59,17 @@ static	void	_exec_child(t_all *all, t_msh *msh, t_cmd *cmd, t_pos pos)
 	}
 	else if (cmd && cmd->name)
 	{
-		if (!cmd_check(all, msh, cmd) || (!tstrcmp(cmd->name, ""))
-			|| !set_execve(msh, cmd))
+		if (!cmd_check(all, msh, cmd) || !set_execve(msh, cmd))
 		{
-			err_msg(NULL, cmd->name, "command not found\n");
+			if (is_a_dir(cmd->name))
+			{
+				err_msg(cmd->name, "Is a directory", NULL);
+				msh->exit = 126;
+			}
+			else if (msh->exit == 126)
+				err_msg(cmd->name, "Permission denied", NULL);
 			free_exit(all, msh, 1);
-			exit(127);
+			exit(msh->exit);
 		}
 		fds(all);
 		if (execve(msh->data->path, msh->data->argv, msh->data->envp) == -1)
@@ -78,23 +84,30 @@ int	fds(t_all *all)
 	cmd = all->lst_cmd;
 	while (cmd)
 	{
-		if (cmd->fds && cmd->fds->fd_infile)
+		if (cmd->fds && cmd->fds->fd_infile > 0)
 			close(cmd->fds->fd_infile);
-		if (cmd->fds && cmd->fds->fd_outfile)
+		if (cmd->fds && cmd->fds->fd_outfile > 0)
 			close(cmd->fds->fd_outfile);
 		cmd = cmd->next;
 	}
+	if (all->msh->_stdin_save > 0)
+		close(all->msh->_stdin_save);
 	return (1);
 }
 
 static	int	exec_fail(t_all *all, t_msh *msh, t_cmd *cmd)
 {
-	err_msg(NULL, cmd->name, "execution failed\n");
+	msh->exit = 0;
+	if (is_a_dir(cmd->name))
+	{
+		err_msg(cmd->name, "Is a directory", NULL);
+		msh->exit = 126;
+	}
 	free(msh->data->path);
 	fsplit(msh->data->argv);
 	fsplit(msh->data->envp);
 	free_exit(all, msh, 1);
-	exit(1);
+	exit(msh->exit);
 }
 
 static	void	check_signal_exit(t_all *all, int rtval)

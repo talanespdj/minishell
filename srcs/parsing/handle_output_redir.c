@@ -13,7 +13,6 @@
 
 static void	output_replace(t_all *all, t_cmd *cmd);
 static void	output_append(t_all *all, t_cmd *cmd);
-static void	open_and_close(t_cmd *cmd, char type);
 
 void	handle_output(t_all *all, t_cmd *cmd)
 {
@@ -37,18 +36,15 @@ static void	output_append(t_all *all, t_cmd *cmd)
 	{
 		if (cmd->redir->outfile)
 			return (free(addr));
-		cmd->redir->outfile = addr;
-		cmd->redir->out_type = 'a';
-		return ;
 	}
-	if (cmd->redir->outfile)
+	else if (cmd->redir->outfile)
 	{
 		free(cmd->redir->outfile);
 		cmd->redir->outfile = NULL;
 	}
 	cmd->redir->outfile = addr;
 	cmd->redir->out_type = 'a';
-	open_and_close(cmd, cmd->redir->out_type);
+	open_and_close(all, cmd, cmd->redir->out_type);
 	return ;
 }
 
@@ -63,29 +59,14 @@ static void	output_replace(t_all *all, t_cmd *cmd)
 	{
 		if (cmd->redir->outfile)
 			return (free(addr));
-		cmd->redir->outfile = addr;
-		cmd->redir->out_type = 'r';
-		return ;
 	}
-	if (cmd->redir->outfile)
+	else if (cmd->redir->outfile)
 	{
 		free(cmd->redir->outfile);
 		cmd->redir->outfile = NULL;
 	}
 	cmd->redir->outfile = addr;
 	cmd->redir->out_type = 'r';
-	open_and_close(cmd, cmd->redir->out_type);
-	return ;
-}
-
-static void	open_and_close(t_cmd *cmd, char type)
-{
-	int	fd;
-
-	if (type == 'a')
-		fd = open(cmd->redir->outfile, O_WRONLY | O_APPEND | O_CREAT, 0666);
-	if (type == 'r')
-		fd = open(cmd->redir->outfile, O_TRUNC | O_WRONLY | O_CREAT, 0666);
-	close(fd);
+	open_and_close(all, cmd, cmd->redir->out_type);
 	return ;
 }
